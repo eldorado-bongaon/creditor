@@ -355,9 +355,9 @@ textarea.form-input{resize:vertical;min-height:64px;}
   }
 
   /* Root tokens */
-  :root{--topbar:52px;}
+  :root{--topbar:50px;}
 
-  /* Layout: topbar full width, below it = full width main (no sidebar column) */
+  /* Layout: single column */
   .layout{
     display:grid;
     grid-template-columns:1fr;
@@ -376,26 +376,27 @@ textarea.form-input{resize:vertical;min-height:64px;}
     box-shadow:4px 0 24px rgba(0,0,0,.35);
   }
   .sidebar.open{transform:translateX(0);}
-
-  /* Mob overlay */
   .mob-overlay{top:var(--topbar);}
 
   /* Main: full width */
   .main{grid-column:1;overflow-y:auto;}
   .view{padding:12px;}
 
-  /* Topbar tweaks */
-  .topbar{padding:0 10px;gap:6px;}
+  /* Topbar: prevent logo wrap */
+  .topbar{padding:0 10px;gap:6px;flex-wrap:nowrap;overflow:hidden;}
   .topbar-sub{display:none;}
-  .topbar-kpis{gap:0;}
-  .kpi{padding:0 8px;}
-  .kpi-val{font-size:.78rem;}
-  .kpi-lbl{font-size:.5rem;}
+  .topbar-brand{flex-shrink:0;min-width:0;}
+  .topbar-logo{font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;}
+  .topbar-kpis{gap:0;flex-shrink:1;min-width:0;overflow:hidden;}
+  .kpi{padding:0 6px;}
+  .kpi-val{font-size:.72rem;}
+  .kpi-lbl{font-size:.48rem;}
   .sync-btn #slabel{display:none;}
-  .sync-btn{padding:5px 8px;margin-left:2px;}
+  .sync-btn{padding:5px 7px;margin-left:2px;flex-shrink:0;}
 
-  /* Stats: 2 cols */
-  .stat-grid{grid-template-columns:repeat(2,1fr);}
+  /* Stats: 2 cols, no horizontal overflow */
+  .stat-grid{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .stat-val{font-size:.95rem;}
 
   /* Toolbar: vertical stack */
   .toolbar{flex-direction:column;align-items:stretch;}
@@ -432,8 +433,10 @@ textarea.form-input{resize:vertical;min-height:64px;}
   .req-grid{grid-template-columns:1fr;}
 }
 
-@media(max-width:420px){
-  .kpi.purple,.kpi:last-child{display:none;}
+@media(max-width:480px){
+  /* Hide 3rd KPI (Pay Requests) to save space */
+  .kpi.purple{display:none;}
+  .topbar-logo{max-width:110px;}
   .prio-selector{grid-template-columns:1fr 1fr;}
 }
 
