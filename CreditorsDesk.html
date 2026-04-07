@@ -528,6 +528,7 @@ textarea.form-input{resize:vertical;min-height:64px;}
     <!-- Bulk bar -->
     <div class="bulk-bar hidden" id="bulk-bar">
       <span style="font-size:.76rem;color:rgba(255,255,255,.7)">Selected: <strong id="bulk-n" style="color:var(--gold3)">0</strong> bills</span>
+      <span style="font-size:.76rem;color:rgba(255,255,255,.55);border-left:1px solid rgba(255,255,255,.15);padding-left:12px">Total Due: <strong id="bulk-total" style="color:#86efac;font-family:var(--mono);font-size:.82rem">₹0</strong></span>
       <button class="btn btn-purple btn-sm" onclick="bulkReq()">💜 Request Payment</button>
       <button class="btn btn-green btn-sm" onclick="bulkPay()">✓ Mark All Paid</button>
       <button class="btn btn-ghost btn-sm" onclick="clearSel()">✕ Clear</button>
@@ -1256,7 +1257,12 @@ function toggleSel(id,ch){if(ch)selIds.add(id);else selIds.delete(id);updBulk();
 function toggleAll(chk){getFiltered().forEach(b=>{if(chk.checked)selIds.add(b.id);else selIds.delete(b.id);});renderTable();updBulk();}
 function selectAll(){document.getElementById('chk-all').checked=true;toggleAll({checked:true});}
 function clearSel(){selIds.clear();document.getElementById('chk-all').checked=false;renderTable();updBulk();}
-function updBulk(){const bb=document.getElementById('bulk-bar'),bn=document.getElementById('bulk-n');if(bn)bn.textContent=selIds.size;if(bb)bb.classList.toggle('hidden',selIds.size===0);}
+function updBulk(){
+  const bb=document.getElementById('bulk-bar'),bn=document.getElementById('bulk-n'),bt=document.getElementById('bulk-total');
+  if(bn)bn.textContent=selIds.size;
+  if(bt){const totalDue=BILLS.filter(b=>selIds.has(b.id)&&!b.paid).reduce((s,b)=>s+b.amount,0);bt.textContent=fmt(totalDue);}
+  if(bb)bb.classList.toggle('hidden',selIds.size===0);
+}
 async function bulkReq(){if(!selIds.size)return;for(const id of selIds)await doReq(id,null,null,'urgent','Bulk request');selIds.clear();updBulk();renderAll();toast(`💜 Payment requested for ${selIds.size||'selected'} bills`,'purple');}
 async function bulkPay(){if(!selIds.size)return;setLoad('Recording payments…',true);for(const id of selIds)await doMarkPaid(id,null,null,'','',true);const n=selIds.size;selIds.clear();updBulk();setLoad('',false);renderAll();toast(`✓ ${n} bills marked paid`,'success');}
 
