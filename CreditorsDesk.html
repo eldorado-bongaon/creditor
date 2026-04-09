@@ -957,7 +957,36 @@ async function fullSync(){
   if(firstLoad)setLoad('Syncing from Google Sheets…',true);
   try{
     const [bills,pays]=await Promise.all([api('getBills'),api('getPays')]);
-    if(Array.isArray(bills)&&bills.length>0) BILLS=bills;
+    if(Array.isArray(bills)&&bills.length>0){
+      if(firstLoad){
+        // First load: use server data directly
+        BILLS=bills;
+      } else {
+        // Subsequent syncs: MERGE — never let server overwrite a locally-paid bill
+        // Build a map of local bills that are paid
+        const localPaidMap={};
+        BILLS.forEach(b=>{if(b.paid)localPaidMap[b.id]=b;});
+        // Replace BILLS with server data but restore any locally-paid state
+        BILLS=bills.map(serverBill=>{
+          const localPaid=localPaidMap[serverBill.id];
+          // If we locally marked this bill as paid but server hasn't caught up yet, keep local paid state
+          if(localPaid && !serverBill.paid) return localPaid;
+          return serverBill;
+        });
+        // Add any new local bills not yet on server (just added this session)
+        const serverIds=new Set(bills.map(b=>b.id));
+        BILLS.forEach(b=>{});  // already merged above
+        // Keep bills that only exist locally (newly added, not yet synced)
+        const localOnly=BILLS.filter(b=>!serverIds.has(b.id));
+        // BILLS already contains server bills; add local-only ones back
+        const serverBillsFinal=bills.map(serverBill=>{
+          const localPaid=localPaidMap[serverBill.id];
+          if(localPaid && !serverBill.paid) return localPaid;
+          return serverBill;
+        });
+        BILLS=[...serverBillsFinal,...localOnly];
+      }
+    }
     if(Array.isArray(pays)) PAY_LOG=pays;
     recalc();lastSync=new Date();setSS('ok','Synced');
     renderAll();updateSettings();
@@ -1326,13 +1355,26 @@ async function doMarkPaid(id,amt,dt,mode,ref,silent){
     b.amount=b.amount-payAmt;
     b.paidOn=dt||today();b.paidMode=mode||'';b.payNote=ref||'';
   } else {
-    // Full payment: mark bill as fully paid
-    b.paid=true;b.paidAmt=payAmt;b.paidOn=dt||today();b.paidMode=mode||'';b.payNote=ref||'';b.payRequested=false;
+    // Full payment: mark bill as fully paid — set immediately so UI updates at once
+    const totalPaid=(b.paidAmt||0)+payAmt;
+    b.paid=true;
+    b.paidAmt=totalPaid;
+    b.amount=0;
+    b.paidOn=dt||today();b.paidMode=mode||'';b.payNote=ref||'';b.payRequested=false;
   }
   PAY_LOG.unshift(pe);
-  try{setLoad('Saving to Google Sheets…',true);await Promise.all([api('updBill',b),api('addPay',pe)]);setLoad('',false);}
-  catch(e){setLoad('',false);toast('Saved locally. Sync error: '+e.message,'error');}
-  if(!silent){renderAll();toast(isPartial?'✓ Part payment recorded — ₹'+payAmt.toLocaleString('en-IN')+' · Balance: '+fmt(b.amount):'✓ Payment recorded — '+b.ref,'success');}
+  // Re-render immediately so paid bill vanishes from unpaid list right away
+  if(!silent) renderAll();
+  // Then save to Sheets in background — UI already updated
+  try{
+    setLoad('Saving to Google Sheets…',true);
+    await Promise.all([api('updBill',b),api('addPay',pe)]);
+    setLoad('',false);
+  } catch(e){
+    setLoad('',false);
+    toast('Saved locally. Sync error: '+e.message,'error');
+  }
+  if(!silent){toast(isPartial?'✓ Part payment recorded — ₹'+payAmt.toLocaleString('en-IN')+' · Balance: '+fmt(b.amount):'✓ Bill fully paid — '+b.ref,'success');}
 }
 /* EDIT PARTIAL PAYMENTS */
 let epBillId=null, epEditIdx=null;
