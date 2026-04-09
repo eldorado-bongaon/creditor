@@ -1064,7 +1064,11 @@ function renderStats(){
 function renderPartySidebar(){
   const pt={};getUnpaid().forEach(b=>{if(!pt[b.party])pt[b.party]=0;pt[b.party]+=b.amount;});
   const sorted=Object.entries(pt).sort((a,b)=>b[1]-a[1]);
-  const dl=document.getElementById('party-dl');if(dl)dl.innerHTML=sorted.map(([p])=>`<option value="${p}">`).join('');
+  // Datalist for Add Bill modal: include ALL parties (unpaid + paid + from pay log)
+  const allParties=new Set(BILLS.map(b=>b.party));
+  PAY_LOG.forEach(l=>{if(l.party)allParties.add(l.party);});
+  const allSorted=[...allParties].sort((a,b)=>a.localeCompare(b));
+  const dl=document.getElementById('party-dl');if(dl)dl.innerHTML=allSorted.map(p=>`<option value="${p}">`).join('');
   const fp=document.getElementById('f-party');
   if(fp)fp.innerHTML='<option value="">All Parties</option>'+sorted.map(([p])=>`<option value="${p}">${p}</option>`).join('');
   const pl=document.getElementById('party-list');
@@ -1467,6 +1471,11 @@ function openAddModal(){
   ['a-party','a-ref','a-amt'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   ['a-bdate','a-ddate'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=today();});
   document.getElementById('a-prio').value='normal';
+  // Refresh datalist with ALL known party names (unpaid + paid + pay log history)
+  const allParties=new Set(BILLS.map(b=>b.party));
+  PAY_LOG.forEach(l=>{if(l.party)allParties.add(l.party);});
+  const dl=document.getElementById('party-dl');
+  if(dl)dl.innerHTML=[...allParties].sort((a,b)=>a.localeCompare(b)).map(p=>`<option value="${p}">`).join('');
   openM('add-overlay');
 }
 async function confirmAdd(){
