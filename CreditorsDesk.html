@@ -318,6 +318,22 @@ textarea.form-input{resize:vertical;min-height:64px;}
 .party-kpi-val{font-family:var(--mono);font-size:.88rem;font-weight:700;color:var(--ink);}
 .party-kpi-lbl{font-size:.6rem;text-transform:uppercase;letter-spacing:.4px;color:var(--ink4);}
 
+/* ═══════ CUSTOM PARTY DROPDOWN ═══════ */
+.party-select-wrap{position:relative;}
+.party-select-input{width:100%;padding:8px 36px 8px 11px;border:1px solid var(--bg3);border-radius:var(--r);font-family:var(--sans);font-size:.82rem;color:var(--ink);outline:none;background:var(--white);cursor:pointer;}
+.party-select-input:focus{border-color:var(--gold2);box-shadow:0 0 0 2px rgba(161,98,7,.1);}
+.party-select-arrow{position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:.7rem;color:var(--ink4);}
+.party-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--white);border:1px solid var(--bg3);border-radius:var(--r);box-shadow:var(--sh2);z-index:600;max-height:220px;overflow-y:auto;display:none;}
+.party-dropdown.open{display:block;}
+.party-dropdown-search{padding:8px 10px;border-bottom:1px solid var(--bg2);position:sticky;top:0;background:var(--white);}
+.party-dropdown-search input{width:100%;padding:6px 10px;border:1px solid var(--bg3);border-radius:var(--r);font-family:var(--sans);font-size:.78rem;outline:none;}
+.party-dropdown-search input:focus{border-color:var(--gold2);}
+.party-option{padding:9px 12px;font-size:.8rem;cursor:pointer;color:var(--ink2);border-bottom:1px solid var(--bg2);}
+.party-option:last-child{border:none;}
+.party-option:hover,.party-option.highlighted{background:var(--amber-tint);color:var(--amber);}
+.party-option.no-match{color:var(--ink4);font-style:italic;cursor:default;}
+.party-option.no-match:hover{background:none;color:var(--ink4);}
+
 /* ═══════ EMPTY STATE ═══════ */
 .empty{padding:48px;text-align:center;color:var(--ink4);}
 .empty-icon{font-size:2rem;margin-bottom:8px;}
@@ -741,8 +757,14 @@ textarea.form-input{resize:vertical;min-height:64px;}
     </div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Party Name *</label>
-        <input class="form-input" id="a-party" list="party-dl" placeholder="PARTY NAME">
-        <datalist id="party-dl"></datalist>
+        <div class="party-select-wrap" id="party-select-wrap">
+          <input class="party-select-input" id="a-party" placeholder="Select or type party name…" readonly autocomplete="off" onclick="togglePartyDropdown()">
+          <span class="party-select-arrow">▼</span>
+          <div class="party-dropdown" id="party-dropdown">
+            <div class="party-dropdown-search"><input type="text" id="party-search" placeholder="Search party…" oninput="filterPartyOptions(this.value)" autocomplete="off"></div>
+            <div id="party-options-list"></div>
+          </div>
+        </div>
       </div>
       <div class="form-group"><label class="form-label">Reference No. *</label><input class="form-input" id="a-ref" placeholder="INV/001/25-26"></div>
       <div class="form-row">
@@ -1064,11 +1086,6 @@ function renderStats(){
 function renderPartySidebar(){
   const pt={};getUnpaid().forEach(b=>{if(!pt[b.party])pt[b.party]=0;pt[b.party]+=b.amount;});
   const sorted=Object.entries(pt).sort((a,b)=>b[1]-a[1]);
-  // Datalist for Add Bill modal: include ALL parties (unpaid + paid + from pay log)
-  const allParties=new Set(BILLS.map(b=>b.party));
-  PAY_LOG.forEach(l=>{if(l.party)allParties.add(l.party);});
-  const allSorted=[...allParties].sort((a,b)=>a.localeCompare(b));
-  const dl=document.getElementById('party-dl');if(dl)dl.innerHTML=allSorted.map(p=>`<option value="${p}">`).join('');
   const fp=document.getElementById('f-party');
   if(fp)fp.innerHTML='<option value="">All Parties</option>'+sorted.map(([p])=>`<option value="${p}">${p}</option>`).join('');
   const pl=document.getElementById('party-list');
@@ -1467,15 +1484,66 @@ async function confirmDel(){
 }
 
 /* ADD */
+/* ════════════════════════════════════
+   CUSTOM PARTY DROPDOWN (cross-device)
+   ════════════════════════════════════ */
+let _partyList=[];
+
+function buildPartyList(){
+  const s=new Set(BILLS.map(b=>b.party));
+  PAY_LOG.forEach(l=>{if(l.party)s.add(l.party);});
+  _partyList=[...s].sort((a,b)=>a.localeCompare(b));
+}
+
+function renderPartyOptions(filter){
+  const list=document.getElementById('party-options-list');if(!list)return;
+  const q=(filter||'').toLowerCase();
+  const filtered=q?_partyList.filter(p=>p.toLowerCase().includes(q)):_partyList;
+  if(!filtered.length){
+    list.innerHTML='<div class="party-option no-match">No match — type to use as new party</div>';
+    return;
+  }
+  list.innerHTML=filtered.map(p=>`<div class="party-option" onclick="selectParty('${p.replace(/'/g,"\\'")}')">${p}</div>`).join('');
+}
+
+function togglePartyDropdown(){
+  const dd=document.getElementById('party-dropdown');
+  const isOpen=dd.classList.contains('open');
+  if(isOpen){closePartyDropdown();return;}
+  buildPartyList();
+  renderPartyOptions('');
+  dd.classList.add('open');
+  setTimeout(()=>{const s=document.getElementById('party-search');if(s){s.value='';s.focus();}},50);
+}
+
+function filterPartyOptions(val){
+  renderPartyOptions(val);
+  // Allow typing a new party name directly into the search box
+  document.getElementById('a-party').value=val.toUpperCase();
+}
+
+function selectParty(name){
+  document.getElementById('a-party').value=name;
+  closePartyDropdown();
+}
+
+function closePartyDropdown(){
+  document.getElementById('party-dropdown')?.classList.remove('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click',function(e){
+  const wrap=document.getElementById('party-select-wrap');
+  if(wrap&&!wrap.contains(e.target))closePartyDropdown();
+});
+
 function openAddModal(){
-  ['a-party','a-ref','a-amt'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  document.getElementById('a-party').value='';
+  ['a-ref','a-amt'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   ['a-bdate','a-ddate'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=today();});
   document.getElementById('a-prio').value='normal';
-  // Refresh datalist with ALL known party names (unpaid + paid + pay log history)
-  const allParties=new Set(BILLS.map(b=>b.party));
-  PAY_LOG.forEach(l=>{if(l.party)allParties.add(l.party);});
-  const dl=document.getElementById('party-dl');
-  if(dl)dl.innerHTML=[...allParties].sort((a,b)=>a.localeCompare(b)).map(p=>`<option value="${p}">`).join('');
+  closePartyDropdown();
+  buildPartyList();
   openM('add-overlay');
 }
 async function confirmAdd(){
